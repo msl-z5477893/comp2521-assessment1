@@ -1,0 +1,195 @@
+#!/bin/sh
+
+cd "$(dirname "$0")"
+
+trap "rm -f .time" EXIT
+
+main()
+{
+	if [ $# -ne 1 ]
+	then
+		echo "usage: $0 <task number (1-4)>"
+		exit 1
+	fi
+
+	case "$1" in
+		1|2|3|4) ;;
+		*) echo "invalid task number '$1'"
+		   exit 1 ;;
+	esac
+
+	compile
+	echo
+
+	case "$1" in
+		1) test_task1 ;;
+		2) test_task2 ;;
+		3) test_task3 ;;
+		4) test_task4 ;;
+	esac
+
+	echo
+}
+
+compile()
+{
+	echo "================================"
+	echo "** Compilation"
+	echo "================================"
+
+	make
+
+	if [ $? -ne 0 ]
+	then
+		exit 1
+	fi
+}
+
+test_task1()
+{
+	echo "================================"
+	echo "** Tests for Task 1"
+	echo "================================"
+
+	data_dir="task1"
+
+	for enc_file in "$data_dir"/*.enc
+	do
+		test_name="$(basename "$enc_file" .enc)"
+		tree_file="$data_dir/$test_name.tree"
+		txt_file="$data_dir/$test_name.txt"
+		exp_txt_file="$data_dir/expected_texts/$test_name.txt"
+
+		if [ ! -f "$tree_file" ]
+		then
+			continue
+		fi
+
+		echo "--------------------------------"
+		echo "** $test_name"
+		echo "--------------------------------"
+
+		rm -f "$txt_file"
+
+		# echo "** Command: /usr/bin/time -f \"%U\" ./decode $tree_file $enc_file $txt_file"
+		/usr/bin/time -f "%U" -o .time ./decode "$tree_file" "$enc_file" "$txt_file" > /dev/null
+
+		if [ $? -ne 0 ]
+		then
+			echo "** Test failed (runtime error)"
+		elif [ ! -f "$exp_txt_file" ]
+		then
+			echo "** Expected output not available"
+		elif [ ! -f "$txt_file" ]
+		then
+			echo "** Test failed (no file produced)"
+		elif ! diff "$txt_file" "$exp_txt_file" > /dev/null
+		then
+			echo "** Test failed (incorrect output)"
+		else
+			echo "** Your output was correct"
+			echo "** Time taken (user time): $(cat .time) seconds"
+		fi
+	done
+}
+
+test_task2()
+{
+	echo "================================"
+	echo "** Tests for Task 2"
+	echo "================================"
+	echo "** Note that this simply runs the tests in testCounter.c"
+	echo
+
+	./testCounter
+}
+
+test_task3()
+{
+	echo "================================"
+	echo "** Tests for Task 3"
+	echo "================================"
+
+	data_dir="task3"
+	reference_path="/web/cs2521/24T2/ass/ass1/references/encodingLength"
+
+	for txt_file in "$data_dir"/*.txt
+	do
+		test_name="$(basename "$txt_file" .txt)"
+		tree_file="$data_dir/$test_name.tree"
+
+		echo "--------------------------------"
+		echo "** $test_name"
+		echo "--------------------------------"
+
+		# echo "** Command: /usr/bin/time -f \"%U\" ./encode $txt_file $tree_file"
+		/usr/bin/time -f "%U" -o .time ./encode "$txt_file" "$tree_file" > /dev/null
+
+		if [ $? -ne 0 ]
+		then
+			echo "** Test failed (runtime error)"
+		elif [ ! -x "$reference_path" ]
+		then
+			echo "** Reference program not available (not connected to CSE)"
+			echo "** Time taken (user time): $(cat .time) seconds"
+		else
+			exp_length="$("$reference_path" "$txt_file" | grep -o "[0-9]*$")"
+			length="$("$reference_path" "$txt_file" "$tree_file" | grep -o "[0-9]*$")"
+			
+			if [ "$exp_length" = "$length" ]
+			then
+				echo "** Your output was correct"
+				echo "** Time taken (user time): $(cat .time) seconds"
+			else
+				echo "** Your output was incorrect"
+				echo "** The minimal encoding length for $txt_file is $exp_length, but your tree produces an encoding length of $length"
+			fi
+		fi
+	done
+}
+
+test_task4()
+{
+	echo "================================"
+	echo "** Tests for Task 4"
+	echo "================================"
+
+	data_dir="task4"
+
+	for txt_file in "$data_dir"/*.txt
+	do
+		test_name="$(basename "$txt_file" .txt)"
+		tree_file="$data_dir/$test_name.tree"
+		enc_file="$data_dir/$test_name.enc"
+		exp_enc_file="$data_dir/expected_encodings/$test_name.enc"
+
+		if [ ! -f "$tree_file" ]
+		then
+			continue
+		fi
+
+		echo "--------------------------------"
+		echo "** $test_name"
+		echo "--------------------------------"
+
+		# echo "** Command: /usr/bin/time -f \"%U\" ./encode $txt_file $tree_file $enc_file"
+		/usr/bin/time -f "%U" -o .time ./encode "$txt_file" "$tree_file" "$enc_file" > /dev/null
+
+		if [ $? -ne 0 ]
+		then
+			echo "** Test failed (runtime error)"
+		elif [ ! -f "$exp_enc_file" ]
+		then
+			echo "** Expected output not available"
+		elif ! diff "$enc_file" "$exp_enc_file" > /dev/null
+		then
+			echo "** Test failed (incorrect output)"
+		else
+			echo "** Your output was correct"
+			echo "** Time taken (user time): $(cat .time) seconds"
+		fi
+	done
+}
+
+main "$@"
+
