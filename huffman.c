@@ -20,7 +20,7 @@ void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
         size_t encoding_ptr = 0;
         struct huffmanTree *root = tree;
         struct huffmanTree *tree_ptr = tree;
-        while (encoding[encoding_ptr] != '\0') {
+        while (true) {
                 if (is_leaf(tree_ptr)) {
                         FileWrite(file, tree_ptr->character);
                         tree_ptr = root;
@@ -31,7 +31,10 @@ void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
                         tree_ptr = tree_ptr->left;
                 } else if (encoding[encoding_ptr] == '1') {
                         tree_ptr = tree_ptr->right;
+                } else {
+                        break;
                 }
+                encoding++;
         }
         FileClose(file);
 }
