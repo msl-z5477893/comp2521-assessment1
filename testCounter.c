@@ -30,7 +30,7 @@ static void test1(void) {
         strcpy(character, characters[i]);
         CounterAdd(counter, character);
     }
-
+    printf("Items in counter: %d.\n", CounterNumItems(counter));
     assert(CounterNumItems(counter) == 4);
 
     CounterFree(counter);
