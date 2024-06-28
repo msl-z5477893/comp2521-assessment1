@@ -12,16 +12,23 @@
 #include "huffman.h"
 
 // CUSTOM HELPER FUNCTIONS
-bool is_leaf(struct huffmanTree *);
+bool isLeaf(struct huffmanTree *);
 
 // Task 1
+// decode huffman data given tree and encoding
+
+// current implementation involves moving a pointer to the tree
+// with the encoding until it points on a leaf, of which
+// we print the character in the tree node then go back to the root
+// node.
+// Potential optimisations available.
 void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
         File file = FileOpenToWrite(outputFilename);
         size_t encoding_ptr = 0;
         struct huffmanTree *root = tree;
         struct huffmanTree *tree_ptr = tree;
         while (true) {
-                if (is_leaf(tree_ptr)) {
+                if (isLeaf(tree_ptr)) {
                         FileWrite(file, tree_ptr->character);
                         tree_ptr = root;
                         continue;
@@ -39,7 +46,7 @@ void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
         FileClose(file);
 }
 
-bool is_leaf(struct huffmanTree *tree) {
+bool isLeaf(struct huffmanTree *tree) {
         return tree->left == NULL && tree->right == NULL;
 }
 
