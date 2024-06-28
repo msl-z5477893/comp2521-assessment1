@@ -13,31 +13,32 @@
 
 // CUSTOM HELPER FUNCTIONS
 bool isLeaf(struct huffmanTree *);
+char *getUtf8Char(File);
 
 // Task 1
 // decode huffman data given tree and encoding
 
 // current implementation involves moving a pointer to the tree
-// with the encoding until it points on a leaf, of which
+// using the encoding until it points on a leaf, of which
 // we print the character in the tree node then go back to the root
 // node.
 // Potential optimisations available.
 void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
         File file = FileOpenToWrite(outputFilename);
-        size_t encoding_ptr = 0;
+        size_t encodingPtr = 0;
         struct huffmanTree *root = tree;
-        struct huffmanTree *tree_ptr = tree;
+        struct huffmanTree *treePtr = tree;
         while (true) {
-                if (isLeaf(tree_ptr)) {
-                        FileWrite(file, tree_ptr->character);
-                        tree_ptr = root;
+                if (isLeaf(treePtr)) {
+                        FileWrite(file, treePtr->character);
+                        treePtr = root;
                         continue;
                 }
 
-                if (encoding[encoding_ptr] == '0') {
-                        tree_ptr = tree_ptr->left;
-                } else if (encoding[encoding_ptr] == '1') {
-                        tree_ptr = tree_ptr->right;
+                if (encoding[encodingPtr] == '0') {
+                        treePtr = treePtr->left;
+                } else if (encoding[encodingPtr] == '1') {
+                        treePtr = treePtr->right;
                 } else {
                         break;
                 }
@@ -46,12 +47,23 @@ void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
         FileClose(file);
 }
 
+// check if current tree node is a leaf
 bool isLeaf(struct huffmanTree *tree) {
         return tree->left == NULL && tree->right == NULL;
 }
 
 // Task 3
-struct huffmanTree *createHuffmanTree(char *inputFilename) { return NULL; }
+struct huffmanTree *createHuffmanTree(char *inputFilename) {
+        Counter charCount = CounterNew();
+        File fstream = FileOpenToRead(inputFilename);
+        FileClose(fstream);
+        CounterFree(charCount);
+        return NULL;
+}
+
+// a character from a file, this function accounts for utf8
+// representation.
+char *getUtf8Char(File fstream) { return NULL; }
 
 // Task 4
 char *encode(struct huffmanTree *tree, char *inputFilename) { return NULL; }
