@@ -9,6 +9,7 @@
 
 #include "Counter.h"
 
+// counter struct, left untouched
 struct counter {
         struct counter *left;
         struct counter *right;
@@ -24,17 +25,21 @@ struct queue {
         struct node *tail;
 };
 
+// node struct for queue
 struct node {
         void *content;
         struct node *next;
 };
 
-struct queue *queueNew(void);
-void queueInsert(struct queue *, void *);
-struct node *queuePop(struct queue *);
-bool queueIsEmpty(struct queue *);
-void queueFree(struct queue *);
+// queue functions
+static struct queue *queueNew(void);
+static void queueInsert(struct queue *, void *);
+static struct node *queuePop(struct queue *);
+static bool queueIsEmpty(struct queue *);
+static void queueFree(struct queue *);
 
+// create new counter tree
+// performance: O(1)
 Counter CounterNew(void) {
         struct counter *new_counter = malloc(sizeof(struct counter));
         new_counter->left = NULL;
@@ -44,6 +49,8 @@ Counter CounterNew(void) {
         return new_counter;
 }
 
+// free counter tree
+// performance: O(n),
 void CounterFree(Counter c) {
         // free branches first then itself
         if (c->left != NULL) {
@@ -55,6 +62,8 @@ void CounterFree(Counter c) {
         free(c);
 }
 
+// record character to counter tree
+// performance: O(h)
 void CounterAdd(Counter c, char *character) {
         if (c->character[0] == '\0') {
                 // case 0: initial tree is empty
@@ -84,6 +93,8 @@ void CounterAdd(Counter c, char *character) {
         // printf("Function call exited.\n");
 }
 
+// count the number of unique items recorded by tree
+// performance: O(n)
 int CounterNumItems(Counter c) {
         // base case
         if (c == NULL) {
@@ -92,6 +103,8 @@ int CounterNumItems(Counter c) {
         return 1 + CounterNumItems(c->left) + CounterNumItems(c->right);
 }
 
+// get the frequency of a given character.
+// performance: O(h)
 int CounterGet(Counter c, char *character) {
         Counter c_ptr = c;
         while (c_ptr != NULL) {
@@ -104,6 +117,8 @@ int CounterGet(Counter c, char *character) {
                 } else if (strcmp(c_ptr->character, character) > 0) {
                         c_ptr = c_ptr->right;
                 } else {
+                        // this is unreachable.
+                        // so return a nonsensical value if we get here somehow.
                         return -1;
                 }
         }
@@ -112,6 +127,7 @@ int CounterGet(Counter c, char *character) {
 
 // creates an item list from the counter tree
 // traverses tree in level order.
+// performance: O(n)
 struct item *CounterItems(Counter c, int *numItems) {
         struct item *items = malloc(sizeof(struct item) * CounterNumItems(c));
         int items_arr_count = 0;
@@ -140,10 +156,11 @@ struct item *CounterItems(Counter c, int *numItems) {
         return items;
 }
 
-// helper functions, uses Queue implementation above.
+// helper functions for function items, uses internal queue implementation.
 
 // create new queue.
-struct queue *queueNew() {
+// performance: O(1)
+static struct queue *queueNew() {
         struct queue *q = malloc(sizeof(struct queue));
         q->head = NULL;
         q->tail = NULL;
@@ -151,7 +168,8 @@ struct queue *queueNew() {
 }
 
 // insert item in queue.
-void queueInsert(struct queue *q, void *item) {
+// performance: O(1)
+static void queueInsert(struct queue *q, void *item) {
         struct node *q_node = malloc(sizeof(struct node));
         q_node->content = item;
         q_node->next = NULL;
@@ -168,17 +186,21 @@ void queueInsert(struct queue *q, void *item) {
 
 // remove the first item in queue.
 // note that popped item must be freed manually.
-struct node *queuePop(struct queue *q) {
+// performance: O(1)
+static struct node *queuePop(struct queue *q) {
         struct node *popped = q->head;
         q->head = q->head->next;
         return popped;
 }
 
 // check if queue is empty.
-bool queueIsEmpty(struct queue *q) { return q->head == NULL; }
+// performance: O(1)
+static bool queueIsEmpty(struct queue *q) { return q->head == NULL; }
 
 // free queue
-void queueFree(struct queue *q) {
+// queue must be empty, otherwise crash
+// performance: O(1)
+static void queueFree(struct queue *q) {
         assert(q->head == NULL);
         free(q);
 }
