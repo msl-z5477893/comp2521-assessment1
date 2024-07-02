@@ -11,9 +11,29 @@
 #include "character.h"
 #include "huffman.h"
 
-// CUSTOM HELPER FUNCTIONS
+// custom helper functions and data structures.
+
+// a linked list for storing multiple huffman trees
+// the list is sorted in ascending order when the tree is added.
+// this is used to create the full huffman tree.
+struct huffmanTreeArena {
+        struct huffmanTreeArenaNode *head;
+        int size;
+};
+
+struct huffmanTreeArenaNode {
+        struct huffmanTreeArenaNode *next;
+        struct huffmanTree *tree;
+};
+
 bool isLeaf(struct huffmanTree *);
 char *getUtf8Char(File);
+struct huffmanTree *huffmanTreeFromItem(struct item);
+
+struct huffmanTreeArena *huffmanTreeArenaNew(void);
+void huffmanTreeArenaFree(struct huffmanTreeArena *);
+struct huffmanTreeArenaNode *huffmanTreeArenaPop(struct huffmanTreeArena *);
+bool huffmanTreeArenaAdd(struct huffmanTreeArena *, struct huffmanTree *);
 
 // Task 1
 // decode huffman data given tree and encoding
@@ -56,15 +76,144 @@ bool isLeaf(struct huffmanTree *tree) {
 struct huffmanTree *createHuffmanTree(char *inputFilename) {
         Counter charCount = CounterNew();
         File fstream = FileOpenToRead(inputFilename);
+        int distinctCharCount = 0;
+
+        // generate count tree.
+        char charUtf8[MAX_CHARACTER_LEN + 1];
+        while (FileReadCharacter(fstream, charUtf8)) {
+                CounterAdd(charCount, charUtf8);
+        }
+
+        // create an array of huffman trees, each containing one character and a
+        // frequncy.
+        struct item *fileCharData = CounterItems(charCount, &distinctCharCount);
+        struct huffmanTreeArena *treeArena = huffmanTreeArenaNew();
+        printf("Start proessing item array...\n");
+        for (int index = 0; index < distinctCharCount - 1; index++) {
+                // printf("proccessing character \"%s\"...\n",
+                //        fileCharData[index].character);
+                struct huffmanTree *tree =
+                    huffmanTreeFromItem(fileCharData[index]);
+                huffmanTreeArenaAdd(treeArena, tree);
+        }
+
+        while (treeArena->size != 1) {
+                struct huffmanTree *newBiggerTree =
+                    malloc(sizeof(struct huffmanTree));
+                struct huffmanTreeArenaNode *arenaNode1 =
+                    huffmanTreeArenaPop(treeArena);
+                struct huffmanTreeArenaNode *arenaNode2 =
+                    huffmanTreeArenaPop(treeArena);
+                struct huffmanTree *lowestFirst = arenaNode1->tree;
+                struct huffmanTree *lowestSecond = arenaNode2->tree;
+
+                newBiggerTree->character = NULL;
+                newBiggerTree->freq = lowestFirst->freq + lowestSecond->freq;
+                newBiggerTree->left = lowestFirst;
+                newBiggerTree->right = lowestSecond;
+
+                huffmanTreeArenaAdd(treeArena, newBiggerTree);
+                free(arenaNode1);
+                free(arenaNode2);
+        }
+        printf("final size of arena: %d\n.", treeArena->size);
+        struct huffmanTreeArenaNode *lastNode = huffmanTreeArenaPop(treeArena);
+        struct huffmanTree *finalTree = lastNode->tree;
+
+        free(lastNode);
+        huffmanTreeArenaFree(treeArena);
+        free(fileCharData);
         FileClose(fstream);
         CounterFree(charCount);
-        return NULL;
+        return finalTree;
 }
 
-// a character from a file, this function accounts for utf8
-// representation.
-char *getUtf8Char(File fstream) { return NULL; }
+// helper functions
+
+// create a leaf huffmanTree from item struct
+struct huffmanTree *huffmanTreeFromItem(struct item item) {
+        struct huffmanTree *newTree = malloc(sizeof(struct huffmanTree));
+        newTree->character = malloc(sizeof(char) * (MAX_CHARACTER_LEN + 1));
+        strncpy(newTree->character, item.character, MAX_CHARACTER_LEN + 1);
+        newTree->freq = item.freq;
+        newTree->left = NULL;
+        newTree->right = NULL;
+        return newTree;
+}
+
+// initialise a huffmanTreeArena
+struct huffmanTreeArena *huffmanTreeArenaNew() {
+        struct huffmanTreeArena *arena =
+            malloc(sizeof(struct huffmanTreeArena));
+        arena->head = NULL;
+        arena->size = 0;
+        return arena;
+}
+
+// free arena
+// this must be done once the full tree is completed
+// asserts that there are no nodes inside.
+void huffmanTreeArenaFree(struct huffmanTreeArena *arena) {
+        assert(arena->size == 0);
+        free(arena->head);
+        free(arena);
+}
+
+// add to huffman tree arena
+// tree must be inserted in ascending order
+// should always return true.
+bool huffmanTreeArenaAdd(struct huffmanTreeArena *arena,
+                         struct huffmanTree *tree) {
+        // memory initialisation
+        struct huffmanTreeArenaNode *newNode =
+            malloc(sizeof(struct huffmanTreeArenaNode));
+
+        // assign objects in memory
+        newNode->tree = tree;
+        newNode->next = NULL;
+
+        // base case: arena has no nodes.
+        if (arena->size == 0) {
+                arena->head = newNode;
+                arena->size++;
+                return true;
+        }
+
+        // case: letter frequency is smallest.
+        if (newNode->tree->freq < arena->head->tree->freq) {
+                newNode->next = arena->head;
+                arena->head = newNode;
+                arena->size++;
+                return true;
+        }
+
+        // case: letter frequency is a middle value.
+        struct huffmanTreeArenaNode *arenaNode = arena->head;
+        while (arenaNode->next != NULL) {
+                if (newNode->tree->freq < arenaNode->next->tree->freq) {
+                        newNode->next = arenaNode->next;
+                        arenaNode->next = newNode;
+                        arena->size++;
+                        return true;
+                }
+                arenaNode = arenaNode->next;
+        }
+
+        // case: letter frequency is largest.
+        arenaNode->next = newNode;
+        arena->size++;
+        return true;
+}
+
+// remove and return the first node in the arena
+// popped nodes must be freed individually.
+struct huffmanTreeArenaNode *
+huffmanTreeArenaPop(struct huffmanTreeArena *arena) {
+        struct huffmanTreeArenaNode *popped = arena->head;
+        arena->head = arena->head->next;
+        arena->size--;
+        return popped;
+}
 
 // Task 4
 char *encode(struct huffmanTree *tree, char *inputFilename) { return NULL; }
-
