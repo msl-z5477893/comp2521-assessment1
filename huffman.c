@@ -1,4 +1,5 @@
 // Implementation of the Huffman module
+// Completed by Michael Stephen Lape (z5477893@ad.unsw.edu.au)
 
 #include <assert.h>
 #include <stdbool.h>
@@ -17,13 +18,13 @@
 // the list is sorted in ascending order when the tree is added.
 // this is used to create the full huffman tree.
 struct huffmanTreeArena {
-        struct huffmanTreeArenaNode *head;
-        int size;
+    struct huffmanTreeArenaNode *head;
+    int size;
 };
 
 struct huffmanTreeArenaNode {
-        struct huffmanTreeArenaNode *next;
-        struct huffmanTree *tree;
+    struct huffmanTreeArenaNode *next;
+    struct huffmanTree *tree;
 };
 
 bool isLeaf(struct huffmanTree *);
@@ -45,125 +46,122 @@ bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
 // node.
 // Potential optimisations available.
 void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
-        File file = FileOpenToWrite(outputFilename);
-        size_t encodingPtr = 0;
-        struct huffmanTree *root = tree;
-        struct huffmanTree *treePtr = tree;
-        while (true) {
-                if (isLeaf(treePtr)) {
-                        FileWrite(file, treePtr->character);
-                        treePtr = root;
-                        continue;
-                }
-
-                if (encoding[encodingPtr] == '0') {
-                        treePtr = treePtr->left;
-                } else if (encoding[encodingPtr] == '1') {
-                        treePtr = treePtr->right;
-                } else {
-                        break;
-                }
-                encoding++;
+    File file = FileOpenToWrite(outputFilename);
+    size_t encodingPtr = 0;
+    struct huffmanTree *root = tree;
+    struct huffmanTree *treePtr = tree;
+    while (true) {
+        if (isLeaf(treePtr)) {
+            FileWrite(file, treePtr->character);
+            treePtr = root;
+            continue;
         }
-        FileClose(file);
+
+        if (encoding[encodingPtr] == '0') {
+            treePtr = treePtr->left;
+        } else if (encoding[encodingPtr] == '1') {
+            treePtr = treePtr->right;
+        } else {
+            break;
+        }
+        encoding++;
+    }
+    FileClose(file);
 }
 
 // check if current tree node is a leaf
 bool isLeaf(struct huffmanTree *tree) {
-        return tree->left == NULL && tree->right == NULL;
+    return tree->left == NULL && tree->right == NULL;
 }
 
 // Task 3
 struct huffmanTree *createHuffmanTree(char *inputFilename) {
-        Counter charCount = CounterNew();
-        File fstream = FileOpenToRead(inputFilename);
-        int distinctCharCount = 0;
+    Counter charCount = CounterNew();
+    File fstream = FileOpenToRead(inputFilename);
+    int distinctCharCount = 0;
 
-        // generate count tree.
-        char charUtf8[MAX_CHARACTER_LEN + 1];
-        while (FileReadCharacter(fstream, charUtf8)) {
-                CounterAdd(charCount, charUtf8);
+    // generate count tree.
+    char charUtf8[MAX_CHARACTER_LEN + 1];
+    while (FileReadCharacter(fstream, charUtf8)) {
+        CounterAdd(charCount, charUtf8);
+    }
+
+    // create an array of huffman trees, each containing one character and a
+    // frequncy.
+    struct item *fileCharData = CounterItems(charCount, &distinctCharCount);
+    struct huffmanTreeArena *treeArena = huffmanTreeArenaNew();
+    printf("Start proessing item array...\n");
+    for (int index = 0; index < distinctCharCount; index++) {
+        // printf("proccessing character \"%s\"...\n",
+        //        fileCharData[index].character);
+        struct huffmanTree *tree = huffmanTreeFromItem(fileCharData[index]);
+        huffmanTreeArenaAdd(treeArena, tree);
+        if (!huffmanTreeArenaAssertOrder(treeArena)) {
+            printf("WARNING: tree went out of order!\n");
         }
+    }
 
-        // create an array of huffman trees, each containing one character and a
-        // frequncy.
-        struct item *fileCharData = CounterItems(charCount, &distinctCharCount);
-        struct huffmanTreeArena *treeArena = huffmanTreeArenaNew();
-        printf("Start proessing item array...\n");
-        for (int index = 0; index < distinctCharCount; index++) {
-                // printf("proccessing character \"%s\"...\n",
-                //        fileCharData[index].character);
-                struct huffmanTree *tree =
-                    huffmanTreeFromItem(fileCharData[index]);
-                huffmanTreeArenaAdd(treeArena, tree);
-                if (!huffmanTreeArenaAssertOrder(treeArena)) {
-                        printf("WARNING: tree went out of order!\n");
-                }
+    while (treeArena->size != 1) {
+        struct huffmanTree *newBiggerTree = malloc(sizeof(struct huffmanTree));
+        struct huffmanTreeArenaNode *arenaNode1 =
+            huffmanTreeArenaPop(treeArena);
+        struct huffmanTreeArenaNode *arenaNode2 =
+            huffmanTreeArenaPop(treeArena);
+        struct huffmanTree *lowestFirst = arenaNode1->tree;
+        struct huffmanTree *lowestSecond = arenaNode2->tree;
+
+        newBiggerTree->character = NULL;
+        newBiggerTree->freq = lowestFirst->freq + lowestSecond->freq;
+        newBiggerTree->left = lowestFirst;
+        newBiggerTree->right = lowestSecond;
+
+        huffmanTreeArenaAdd(treeArena, newBiggerTree);
+        free(arenaNode1);
+        free(arenaNode2);
+        if (!huffmanTreeArenaAssertOrder(treeArena)) {
+            printf("WARNING: tree went out of order!\n");
         }
+    }
+    printf("final size of arena: %d\n.", treeArena->size);
+    struct huffmanTreeArenaNode *lastNode = huffmanTreeArenaPop(treeArena);
+    struct huffmanTree *finalTree = lastNode->tree;
 
-        while (treeArena->size != 1) {
-                struct huffmanTree *newBiggerTree =
-                    malloc(sizeof(struct huffmanTree));
-                struct huffmanTreeArenaNode *arenaNode1 =
-                    huffmanTreeArenaPop(treeArena);
-                struct huffmanTreeArenaNode *arenaNode2 =
-                    huffmanTreeArenaPop(treeArena);
-                struct huffmanTree *lowestFirst = arenaNode1->tree;
-                struct huffmanTree *lowestSecond = arenaNode2->tree;
-
-                newBiggerTree->character = NULL;
-                newBiggerTree->freq = lowestFirst->freq + lowestSecond->freq;
-                newBiggerTree->left = lowestFirst;
-                newBiggerTree->right = lowestSecond;
-
-                huffmanTreeArenaAdd(treeArena, newBiggerTree);
-                free(arenaNode1);
-                free(arenaNode2);
-                if (!huffmanTreeArenaAssertOrder(treeArena)) {
-                        printf("WARNING: tree went out of order!\n");
-                }
-        }
-        printf("final size of arena: %d\n.", treeArena->size);
-        struct huffmanTreeArenaNode *lastNode = huffmanTreeArenaPop(treeArena);
-        struct huffmanTree *finalTree = lastNode->tree;
-
-        free(lastNode);
-        huffmanTreeArenaFree(treeArena);
-        free(fileCharData);
-        FileClose(fstream);
-        CounterFree(charCount);
-        return finalTree;
+    free(lastNode);
+    huffmanTreeArenaFree(treeArena);
+    free(fileCharData);
+    FileClose(fstream);
+    CounterFree(charCount);
+    return finalTree;
 }
 
 // helper functions
 
 // create a leaf huffmanTree from item struct
 struct huffmanTree *huffmanTreeFromItem(struct item item) {
-        struct huffmanTree *newTree = malloc(sizeof(struct huffmanTree));
-        newTree->character = malloc(sizeof(char) * (MAX_CHARACTER_LEN + 1));
-        strncpy(newTree->character, item.character, MAX_CHARACTER_LEN + 1);
-        newTree->freq = item.freq;
-        newTree->left = NULL;
-        newTree->right = NULL;
-        return newTree;
+    struct huffmanTree *newTree = malloc(sizeof(struct huffmanTree));
+    newTree->character = malloc(sizeof(char) * (MAX_CHARACTER_LEN + 1));
+    strncpy(newTree->character, item.character, MAX_CHARACTER_LEN + 1);
+    newTree->freq = item.freq;
+    newTree->left = NULL;
+    newTree->right = NULL;
+    return newTree;
 }
 
 // initialise a huffmanTreeArena
 struct huffmanTreeArena *huffmanTreeArenaNew() {
-        struct huffmanTreeArena *arena =
-            malloc(sizeof(struct huffmanTreeArena));
-        arena->head = NULL;
-        arena->size = 0;
-        return arena;
+    struct huffmanTreeArena *arena = malloc(sizeof(struct huffmanTreeArena));
+    arena->head = NULL;
+    arena->size = 0;
+    return arena;
 }
 
 // free arena
 // this must be done once the full tree is completed
 // asserts that there are no nodes inside.
 void huffmanTreeArenaFree(struct huffmanTreeArena *arena) {
-        assert(arena->size == 0);
-        free(arena->head);
-        free(arena);
+    assert(arena->size == 0);
+    free(arena->head);
+    free(arena);
 }
 
 // add to huffman tree arena
@@ -171,67 +169,67 @@ void huffmanTreeArenaFree(struct huffmanTreeArena *arena) {
 // should always return true.
 bool huffmanTreeArenaAdd(struct huffmanTreeArena *arena,
                          struct huffmanTree *tree) {
-        // memory initialisation
-        struct huffmanTreeArenaNode *newNode =
-            malloc(sizeof(struct huffmanTreeArenaNode));
+    // memory initialisation
+    struct huffmanTreeArenaNode *newNode =
+        malloc(sizeof(struct huffmanTreeArenaNode));
 
-        // assign objects in memory
-        newNode->tree = tree;
-        newNode->next = NULL;
+    // assign objects in memory
+    newNode->tree = tree;
+    newNode->next = NULL;
 
-        // base case: arena has no nodes.
-        if (arena->size == 0) {
-                arena->head = newNode;
-                arena->size++;
-                return true;
-        }
-
-        // case: letter frequency is smallest.
-        if (newNode->tree->freq < arena->head->tree->freq) {
-                newNode->next = arena->head;
-                arena->head = newNode;
-                arena->size++;
-                return true;
-        }
-
-        // case: letter frequency is a middle value.
-        struct huffmanTreeArenaNode *arenaNode = arena->head;
-        while (arenaNode->next != NULL) {
-                if (newNode->tree->freq < arenaNode->next->tree->freq) {
-                        newNode->next = arenaNode->next;
-                        arenaNode->next = newNode;
-                        arena->size++;
-                        return true;
-                }
-                arenaNode = arenaNode->next;
-        }
-
-        // case: letter frequency is largest.
-        arenaNode->next = newNode;
+    // base case: arena has no nodes.
+    if (arena->size == 0) {
+        arena->head = newNode;
         arena->size++;
         return true;
+    }
+
+    // case: letter frequency is smallest.
+    if (newNode->tree->freq < arena->head->tree->freq) {
+        newNode->next = arena->head;
+        arena->head = newNode;
+        arena->size++;
+        return true;
+    }
+
+    // case: letter frequency is a middle value.
+    struct huffmanTreeArenaNode *arenaNode = arena->head;
+    while (arenaNode->next != NULL) {
+        if (newNode->tree->freq < arenaNode->next->tree->freq) {
+            newNode->next = arenaNode->next;
+            arenaNode->next = newNode;
+            arena->size++;
+            return true;
+        }
+        arenaNode = arenaNode->next;
+    }
+
+    // case: letter frequency is largest.
+    arenaNode->next = newNode;
+    arena->size++;
+    return true;
 }
 
 // remove and return the first node in the arena
 // popped nodes must be freed individually.
 struct huffmanTreeArenaNode *
 huffmanTreeArenaPop(struct huffmanTreeArena *arena) {
-        struct huffmanTreeArenaNode *popped = arena->head;
-        arena->head = arena->head->next;
-        arena->size--;
-        return popped;
+    struct huffmanTreeArenaNode *popped = arena->head;
+    arena->head = arena->head->next;
+    arena->size--;
+    return popped;
 }
 
 // checks that the trees in the arena is still in ascending order.
 bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *arena) {
-        struct huffmanTreeArenaNode *arenaNode = arena->head;
-        while (arenaNode->next != NULL) {
-                if (arenaNode->tree->freq > arenaNode->next->tree->freq) {
-                        return false;
-                }
-                arenaNode = arenaNode->next;
+    struct huffmanTreeArenaNode *arenaNode = arena->head;
+    while (arenaNode->next != NULL) {
+        if (arenaNode->tree->freq > arenaNode->next->tree->freq) {
+            return false;
         }
-        return true;
+        arenaNode = arenaNode->next;
+    }
+    return true;
 }
 
 // Task 4
