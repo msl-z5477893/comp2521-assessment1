@@ -34,6 +34,7 @@ struct huffmanTreeArena *huffmanTreeArenaNew(void);
 void huffmanTreeArenaFree(struct huffmanTreeArena *);
 struct huffmanTreeArenaNode *huffmanTreeArenaPop(struct huffmanTreeArena *);
 bool huffmanTreeArenaAdd(struct huffmanTreeArena *, struct huffmanTree *);
+bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
 
 // Task 1
 // decode huffman data given tree and encoding
@@ -89,12 +90,15 @@ struct huffmanTree *createHuffmanTree(char *inputFilename) {
         struct item *fileCharData = CounterItems(charCount, &distinctCharCount);
         struct huffmanTreeArena *treeArena = huffmanTreeArenaNew();
         printf("Start proessing item array...\n");
-        for (int index = 0; index < distinctCharCount - 1; index++) {
+        for (int index = 0; index < distinctCharCount; index++) {
                 // printf("proccessing character \"%s\"...\n",
                 //        fileCharData[index].character);
                 struct huffmanTree *tree =
                     huffmanTreeFromItem(fileCharData[index]);
                 huffmanTreeArenaAdd(treeArena, tree);
+                if (!huffmanTreeArenaAssertOrder(treeArena)) {
+                        printf("WARNING: tree went out of order!\n");
+                }
         }
 
         while (treeArena->size != 1) {
@@ -115,6 +119,9 @@ struct huffmanTree *createHuffmanTree(char *inputFilename) {
                 huffmanTreeArenaAdd(treeArena, newBiggerTree);
                 free(arenaNode1);
                 free(arenaNode2);
+                if (!huffmanTreeArenaAssertOrder(treeArena)) {
+                        printf("WARNING: tree went out of order!\n");
+                }
         }
         printf("final size of arena: %d\n.", treeArena->size);
         struct huffmanTreeArenaNode *lastNode = huffmanTreeArenaPop(treeArena);
@@ -213,6 +220,18 @@ huffmanTreeArenaPop(struct huffmanTreeArena *arena) {
         arena->head = arena->head->next;
         arena->size--;
         return popped;
+}
+
+// checks that the trees in the arena is still in ascending order.
+bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *arena) {
+        struct huffmanTreeArenaNode *arenaNode = arena->head;
+        while (arenaNode->next != NULL) {
+                if (arenaNode->tree->freq > arenaNode->next->tree->freq) {
+                        return false;
+                }
+                arenaNode = arenaNode->next;
+        }
+        return true;
 }
 
 // Task 4
