@@ -27,15 +27,17 @@ struct huffmanTreeArenaNode {
     struct huffmanTree *tree;
 };
 
-bool isLeaf(struct huffmanTree *);
-char *getUtf8Char(File);
-struct huffmanTree *huffmanTreeFromItem(struct item);
+static bool isLeaf(struct huffmanTree *);
+static char *getUtf8Char(File);
+static struct huffmanTree *huffmanTreeFromItem(struct item);
 
-struct huffmanTreeArena *huffmanTreeArenaNew(void);
-void huffmanTreeArenaFree(struct huffmanTreeArena *);
-struct huffmanTreeArenaNode *huffmanTreeArenaPop(struct huffmanTreeArena *);
-bool huffmanTreeArenaAdd(struct huffmanTreeArena *, struct huffmanTree *);
-bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
+static struct huffmanTreeArena *huffmanTreeArenaNew(void);
+static void huffmanTreeArenaFree(struct huffmanTreeArena *);
+static struct huffmanTreeArenaNode *
+huffmanTreeArenaPop(struct huffmanTreeArena *);
+static bool huffmanTreeArenaAdd(struct huffmanTreeArena *,
+                                struct huffmanTree *);
+static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
 
 // Task 1
 // decode huffman data given tree and encoding
@@ -70,7 +72,7 @@ void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
 }
 
 // check if current tree node is a leaf
-bool isLeaf(struct huffmanTree *tree) {
+static bool isLeaf(struct huffmanTree *tree) {
     return tree->left == NULL && tree->right == NULL;
 }
 
@@ -137,7 +139,7 @@ struct huffmanTree *createHuffmanTree(char *inputFilename) {
 // helper functions
 
 // create a leaf huffmanTree from item struct
-struct huffmanTree *huffmanTreeFromItem(struct item item) {
+static struct huffmanTree *huffmanTreeFromItem(struct item item) {
     struct huffmanTree *newTree = malloc(sizeof(struct huffmanTree));
     newTree->character = malloc(sizeof(char) * (MAX_CHARACTER_LEN + 1));
     strncpy(newTree->character, item.character, MAX_CHARACTER_LEN + 1);
@@ -148,7 +150,7 @@ struct huffmanTree *huffmanTreeFromItem(struct item item) {
 }
 
 // initialise a huffmanTreeArena
-struct huffmanTreeArena *huffmanTreeArenaNew() {
+static struct huffmanTreeArena *huffmanTreeArenaNew() {
     struct huffmanTreeArena *arena = malloc(sizeof(struct huffmanTreeArena));
     arena->head = NULL;
     arena->size = 0;
@@ -158,7 +160,7 @@ struct huffmanTreeArena *huffmanTreeArenaNew() {
 // free arena
 // this must be done once the full tree is completed
 // asserts that there are no nodes inside.
-void huffmanTreeArenaFree(struct huffmanTreeArena *arena) {
+static void huffmanTreeArenaFree(struct huffmanTreeArena *arena) {
     assert(arena->size == 0);
     free(arena->head);
     free(arena);
@@ -167,8 +169,8 @@ void huffmanTreeArenaFree(struct huffmanTreeArena *arena) {
 // add to huffman tree arena
 // tree must be inserted in ascending order
 // should always return true.
-bool huffmanTreeArenaAdd(struct huffmanTreeArena *arena,
-                         struct huffmanTree *tree) {
+static bool huffmanTreeArenaAdd(struct huffmanTreeArena *arena,
+                                struct huffmanTree *tree) {
     // memory initialisation
     struct huffmanTreeArenaNode *newNode =
         malloc(sizeof(struct huffmanTreeArenaNode));
@@ -212,7 +214,7 @@ bool huffmanTreeArenaAdd(struct huffmanTreeArena *arena,
 
 // remove and return the first node in the arena
 // popped nodes must be freed individually.
-struct huffmanTreeArenaNode *
+static struct huffmanTreeArenaNode *
 huffmanTreeArenaPop(struct huffmanTreeArena *arena) {
     struct huffmanTreeArenaNode *popped = arena->head;
     arena->head = arena->head->next;
@@ -221,7 +223,7 @@ huffmanTreeArenaPop(struct huffmanTreeArena *arena) {
 }
 
 // checks that the trees in the arena is still in ascending order.
-bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *arena) {
+static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *arena) {
     struct huffmanTreeArenaNode *arenaNode = arena->head;
     while (arenaNode->next != NULL) {
         if (arenaNode->tree->freq > arenaNode->next->tree->freq) {
