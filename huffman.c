@@ -27,10 +27,39 @@ struct huffmanTreeArenaNode {
     struct huffmanTree *tree;
 };
 
-static bool isLeaf(struct huffmanTree *);
-static char *getUtf8Char(File);
-static struct huffmanTree *huffmanTreeFromItem(struct item);
+// a unit structure relating a character to its corresponding encoding
+struct charEncoding {
+    char *character;
+    char *code;
+};
 
+// linked-list representation of a code prefix.
+typedef struct prefixNode {
+    char dir;
+    struct prefixNode *next;
+} PrefixNode;
+
+struct prefixPath {
+    PrefixNode *head;
+    PrefixNode *tail;
+    char *character;
+    int length;
+};
+
+// for very large strings
+struct buffer {
+    char *str;
+    unsigned int capacity;
+    unsigned int charCount;
+};
+
+// misc functions.
+static bool isLeaf(struct huffmanTree *);
+static int leafCount(struct huffmanTree *);
+static char *getUtf8Char(File);
+
+// HuffmanTreeArena functions
+static struct huffmanTree *huffmanTreeFromItem(struct item);
 static struct huffmanTreeArena *huffmanTreeArenaNew(void);
 static void huffmanTreeArenaFree(struct huffmanTreeArena *);
 static struct huffmanTreeArenaNode *
@@ -38,6 +67,13 @@ huffmanTreeArenaPop(struct huffmanTreeArena *);
 static bool huffmanTreeArenaAdd(struct huffmanTreeArena *,
                                 struct huffmanTree *);
 static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
+
+// prefix path functions
+static struct prefixPath *convertBranchToPath(struct huffmanTree *);
+
+// buffer function
+static struct buffer *initBuffer(size_t size);
+static void insertToBuffer(char *chars);
 
 // Task 1
 // decode huffman data given tree and encoding
@@ -235,4 +271,34 @@ static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *arena) {
 }
 
 // Task 4
-char *encode(struct huffmanTree *tree, char *inputFilename) { return NULL; }
+char *encode(struct huffmanTree *tree, char *inputFilename) {
+    // get all possible character encodings
+    // TODO: fix this somehow
+    File fstream = FileOpenToRead(inputFilename);
+    int uniqueLetterCount = leafCount(tree);
+    struct prefixPath *paths =
+        malloc(sizeof(struct prefixPath) * uniqueLetterCount);
+    for (int i = 0; i < uniqueLetterCount; i++) {
+        paths[i] = *convertBranchToPath(tree);
+        if (&paths[i] == NULL) {
+            printf("THAT SHOULD NOT BE NULL!\n");
+        }
+    }
+
+    // somehow encode the entire text in file onto one massive string.
+    free(paths);
+    FileClose(fstream);
+    return NULL;
+}
+
+// get the number of leaves in the tree
+static int leafCount(struct huffmanTree *tree) {
+    if (tree == NULL) {
+        return 0;
+    }
+    int countedLeaves = leafCount(tree->left) + leafCount(tree->right);
+    if (countedLeaves == 0) {
+        return countedLeaves + 1;
+    }
+    return countedLeaves;
+}
