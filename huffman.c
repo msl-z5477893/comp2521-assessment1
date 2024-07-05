@@ -291,6 +291,14 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
     return NULL;
 }
 
+// convert a branch in the huffman tree into a prefix path
+static struct prefixPath *convertBranchToPath(struct huffmanTree *tree) {
+    while (true) {
+        break;
+    }
+    return NULL;
+}
+
 // get the number of leaves in the tree
 static int leafCount(struct huffmanTree *tree) {
     if (tree == NULL) {
