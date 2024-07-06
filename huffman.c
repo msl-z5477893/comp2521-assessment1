@@ -12,6 +12,10 @@
 #include "character.h"
 #include "huffman.h"
 
+#define ENCODING_0 '0'
+#define ENCODING_1 '1'
+// #define ENCODING_END 'x'
+
 // custom helper functions and data structures.
 
 // a linked list for storing multiple huffman trees
@@ -36,13 +40,13 @@ struct charEncoding {
 // linked-list representation of a code prefix.
 typedef struct prefixNode {
     char dir;
+    char *finalChar;
     struct prefixNode *next;
 } PrefixNode;
 
 struct prefixPath {
     PrefixNode *head;
     PrefixNode *tail;
-    char *character;
     int length;
 };
 
@@ -69,11 +73,15 @@ static bool huffmanTreeArenaAdd(struct huffmanTreeArena *,
 static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
 
 // prefix path functions
+static struct prefixPath *prefixPathNew(void);
+static struct prefixPath *prefixPathRecord(struct prefixPath *, char, char *);
 static struct prefixPath *convertBranchToPath(struct huffmanTree *);
+static struct charEncoding prefixPathEncoding(struct prefixPath *);
 
 // buffer function
-static struct buffer *initBuffer(size_t size);
-static void insertToBuffer(char *chars);
+static struct buffer *bufferInit(size_t size);
+static void bufferInsert(struct buffer *, char *chars);
+static void bufferFree(struct buffer *);
 
 // Task 1
 // decode huffman data given tree and encoding
@@ -276,17 +284,28 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
     // TODO: fix this somehow
     File fstream = FileOpenToRead(inputFilename);
     int uniqueLetterCount = leafCount(tree);
-    struct prefixPath *paths =
-        malloc(sizeof(struct prefixPath) * uniqueLetterCount);
+    struct charEncoding *encodings =
+        malloc(sizeof(struct charEncoding) * uniqueLetterCount);
+    struct buffer *buf = bufferInit(uniqueLetterCount * uniqueLetterCount);
+    char charBuf[MAX_CHARACTER_LEN + 1];
     for (int i = 0; i < uniqueLetterCount; i++) {
-        paths[i] = *convertBranchToPath(tree);
-        if (&paths[i] == NULL) {
+        struct prefixPath *getPath = convertBranchToPath(tree);
+        if (getPath == NULL) {
             printf("THAT SHOULD NOT BE NULL!\n");
+            exit(EXIT_FAILURE);
         }
+        encodings[i] = prefixPathEncoding(getPath);
+    }
+    while (FileReadCharacter(fstream, charBuf)) {
+        // TODO: implement algorithm for faster accessing within encoding array.
+        bufferInsert(buf, NULL);
     }
 
     // somehow encode the entire text in file onto one massive string.
-    free(paths);
+
+    // cleanup :)
+    free(encodings);
+    bufferFree(buf);
     FileClose(fstream);
     return NULL;
 }
