@@ -14,9 +14,11 @@
 
 #define ENCODING_0 '0'
 #define ENCODING_1 '1'
-// #define ENCODING_END 'x'
+#define ENCODING_END '\0'
 
 // custom helper functions and data structures.
+
+// Task 3 Data Structures.
 
 // a linked list for storing multiple huffman trees
 // the list is sorted in ascending order when the tree is added.
@@ -30,6 +32,8 @@ struct huffmanTreeArenaNode {
     struct huffmanTreeArenaNode *next;
     struct huffmanTree *tree;
 };
+
+// Task 4 Data Structures.
 
 // a unit structure relating a character to its corresponding encoding
 struct charEncoding {
@@ -50,6 +54,19 @@ struct prefixPath {
     int length;
 };
 
+// a unit struct for performing level-order traversal of tree
+struct huffmanCrawler {
+    struct prefixPath *address;
+    struct huffmanTree *tree;
+    struct huffmanCrawler *next;
+};
+
+// a queue for traversing a huffman tree
+struct huffmanTraverser {
+    struct huffmanCrawler *head;
+    struct huffmanCrawler *tail;
+};
+
 // for very large strings
 struct buffer {
     char *str;
@@ -57,10 +74,19 @@ struct buffer {
     unsigned int charCount;
 };
 
+// an avl tree used for encoding data
+struct encodingTree {
+    char *code;
+    int charSum;
+    struct encodingTree *left;
+    struct encodingTree *right;
+};
+
 // misc functions.
 static bool isLeaf(struct huffmanTree *);
 static int leafCount(struct huffmanTree *);
 static char *getUtf8Char(File);
+static int characterSum(char *);
 
 // HuffmanTreeArena functions
 static struct huffmanTree *huffmanTreeFromItem(struct item);
@@ -78,19 +104,29 @@ static struct prefixPath *prefixPathRecord(struct prefixPath *, char, char *);
 static struct prefixPath *convertBranchToPath(struct huffmanTree *);
 static struct charEncoding prefixPathEncoding(struct prefixPath *);
 
+// huffmanCrawler functions
+static struct huffmanCrawler *crawlLeft(struct huffmanCrawler *crawler);
+static struct huffmanCrawler *crawlRight(struct huffmanCrawler *crawler);
+
+// huffmanQueue functions
+static struct huffmanTraverser *huffmanTraverserInit(struct huffmanTree *tree);
+static struct charEncoding *huffmanTraverserPerform(void);
+static void huffmanTraverserDeinit(struct huffmanTraverser *);
+
 // buffer function
 static struct buffer *bufferInit(size_t size);
+static char *bufferGetStr(struct buffer *);
 static void bufferInsert(struct buffer *, char *chars);
 static void bufferFree(struct buffer *);
 
+// encodingTree functions
+static struct encodingTree *encodingTreeInit(void);
+static void encodingTreeFree(struct encodingTree *);
+static void encodingTreeInsert(struct charEncoding);
+static char *encodingTreeGetCode(char *character);
+
 // Task 1
 // decode huffman data given tree and encoding
-
-// current implementation involves moving a pointer to the tree
-// using the encoding until it points on a leaf, of which
-// we print the character in the tree node then go back to the root
-// node.
-// Potential optimisations available.
 void decode(struct huffmanTree *tree, char *encoding, char *outputFilename) {
     File file = FileOpenToWrite(outputFilename);
     size_t encodingPtr = 0;
@@ -280,42 +316,35 @@ static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *arena) {
 
 // Task 4
 char *encode(struct huffmanTree *tree, char *inputFilename) {
-    // get all possible character encodings
     // TODO: fix this somehow
+    // initial data
     File fstream = FileOpenToRead(inputFilename);
     int uniqueLetterCount = leafCount(tree);
-    struct charEncoding *encodings =
-        malloc(sizeof(struct charEncoding) * uniqueLetterCount);
     struct buffer *buf = bufferInit(uniqueLetterCount * uniqueLetterCount);
+    struct encodingTree *encodeTree = encodingTreeInit();
+    struct huffmanTraverser *trav = huffmanTraverserInit(tree);
+    struct charEncoding *encoding = huffmanTraverserPerform();
+    while (encoding != NULL) {
+        encodingTreeInsert(*encoding);
+        encoding = huffmanTraverserPerform();
+    }
     char charBuf[MAX_CHARACTER_LEN + 1];
-    for (int i = 0; i < uniqueLetterCount; i++) {
-        struct prefixPath *getPath = convertBranchToPath(tree);
-        if (getPath == NULL) {
-            printf("THAT SHOULD NOT BE NULL!\n");
-            exit(EXIT_FAILURE);
-        }
-        encodings[i] = prefixPathEncoding(getPath);
-    }
-    while (FileReadCharacter(fstream, charBuf)) {
-        // TODO: implement algorithm for faster accessing within encoding array.
-        bufferInsert(buf, NULL);
-    }
+    // TODO: get all possible character encodings
 
     // somehow encode the entire text in file onto one massive string.
+    while (FileReadCharacter(fstream, charBuf)) {
+        char *charPrefixCode = encodingTreeGetCode(charBuf);
+        bufferInsert(buf, charPrefixCode);
+    }
+
+    char *result = bufferGetStr(buf);
 
     // cleanup :)
-    free(encodings);
+    encodingTreeFree(encodeTree);
+    huffmanTraverserDeinit(trav);
     bufferFree(buf);
     FileClose(fstream);
-    return NULL;
-}
-
-// convert a branch in the huffman tree into a prefix path
-static struct prefixPath *convertBranchToPath(struct huffmanTree *tree) {
-    while (true) {
-        break;
-    }
-    return NULL;
+    return result;
 }
 
 // get the number of leaves in the tree
@@ -328,4 +357,20 @@ static int leafCount(struct huffmanTree *tree) {
         return countedLeaves + 1;
     }
     return countedLeaves;
+}
+
+static int treeHeight(struct huffmanTree *tree) {
+    if (tree == NULL) {
+        return 0;
+    } else {
+        int heightLeft = treeHeight(tree->left);
+        int heightRight = treeHeight(tree->right);
+        int max;
+        if (heightLeft > heightRight) {
+            max = heightLeft;
+        } else {
+            max = heightRight;
+        }
+        return max + 1;
+    }
 }
