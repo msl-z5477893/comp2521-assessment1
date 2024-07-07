@@ -344,23 +344,22 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
 
     // generate encoding tree from huffman tree
     for (int ix = 0; ix < symCount; ix++) {
-        // probably will leak
-        encoders[ix] = *huffmanTraverserPerform(trav);
-        // initially the function returned a charEncoding and had
-        // to be converted to an encoder
-        //
-        // struct charEncoding *encoding = huffmanTraverserPerform(trav);
-        // encoders[ix].charSum = characterSum(encoding->character);
-        // strncpy(encoders[ix].encoding, encoding->code, MAX_CHARACTER_LEN +
-        // 1); free(encoding);
+        // this leaks
+        // encoders[ix] = *huffmanTraverserPerform(trav);
+        struct encoder *enc = huffmanTraverserPerform(trav);
+        encoders[ix].charSum = enc->charSum;
+        encoders[ix].encodingLength = enc->encodingLength;
+        printf("enc->encodingLength = %d\n", enc->encodingLength);
+        printf("length of encoding with null byte: %lu\n",
+               strlen(enc->encoding) + 1);
+        encoders[ix].encoding = malloc(encoders[ix].encodingLength);
+        // @broken
+        // strncpy(encoders[ix].encoding, enc->encoding,
+        // encoders->encodingLength);
+        strncpy(encoders[ix].encoding, enc->encoding, enc->encodingLength);
+        free(enc->encoding);
+        free(enc);
     }
-    // struct charEncoding *encoding = huffmanTraverserPerform(trav);
-    // while (encoding != NULL) {
-    //     encodingTreeInsert(*encoding);
-    //     free(encoding);
-    //     encoding = huffmanTraverserPerform(trav);
-    // }
-    // TODO: get all possible character encodings
 
     // somehow encode the entire text in file onto one massive string.
     while (FileReadCharacter(fstream, charBuf)) {
@@ -372,11 +371,14 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
         }
         bufferInsert(buf, encoders[ix].encoding, encoders[ix].encodingLength);
     }
+    // bufferInsert(buf, "\n", strlen("\n") + 1);
 
     char *result = bufferGetStr(buf);
 
     // cleanup :)
-    // encodingTreeFree(encodeTree);
+    for (int ix = 0; ix < symCount; ix++) {
+        free(encoders[ix].encoding);
+    }
     free(encoders);
     huffmanTraverserDeinit(trav);
     bufferFree(buf);
@@ -461,6 +463,7 @@ static struct encoder *huffmanTraverserPerform(struct huffmanTraverser *trav) {
                 struct huffmanCrawler *right = crawlRight(poppedCrawler);
                 huffmanTraverserAdd(trav, right);
             }
+            prefixPathFree(poppedCrawler->address);
             free(poppedCrawler);
         }
     }
@@ -545,6 +548,7 @@ static void prefixPathFree(struct prefixPath *path) {
         }
         free(trash);
     }
+    free(path);
 }
 
 // generate an encoder for a specific character based on recorded
@@ -613,6 +617,8 @@ struct buffer *bufferInit(size_t size) {
     nBuf->charCount = 0;
     nBuf->capacity = size;
     nBuf->str = malloc(nBuf->capacity);
+    // needed for string functions to work.
+    nBuf->str[0] = '\0';
     return nBuf;
 }
 
@@ -620,8 +626,12 @@ struct buffer *bufferInit(size_t size) {
 static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
     unsigned int newCount = buf->charCount + len;
     if (newCount >= buf->capacity) {
+        printf("Resizing buffer cap from %d", buf->capacity);
         buf->capacity *= buf->capacity;
-        buf->str = realloc(buf->str, buf->capacity);
+        printf("to %d.\n", buf->capacity);
+        char *resize = realloc(buf->str, buf->capacity);
+        assert(resize != NULL);
+        buf->str = resize;
     }
     strncat(buf->str, chars, len);
     buf->charCount = newCount;
@@ -629,6 +639,7 @@ static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
 
 // return the string stored in the buffer
 static char *bufferGetStr(struct buffer *buf) {
+    printf("Buffer contents: %s\n", buf->str);
     char *output = malloc(buf->charCount + 1);
     strncpy(output, buf->str, buf->charCount + 1);
     output[buf->charCount] = '\0';
