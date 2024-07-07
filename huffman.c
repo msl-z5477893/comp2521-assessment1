@@ -194,7 +194,6 @@ struct huffmanTree *createHuffmanTree(char *inputFilename) {
         free(arenaNode1);
         free(arenaNode2);
     }
-    printf("final size of arena: %d\n.", treeArena->size);
     struct huffmanTreeArenaNode *lastNode = huffmanTreeArenaPop(treeArena);
     struct huffmanTree *finalTree = lastNode->tree;
 
@@ -310,9 +309,6 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
         struct encoder *enc = huffmanTraverserPerform(trav);
         encoders[ix].charSum = enc->charSum;
         encoders[ix].encodingLength = enc->encodingLength;
-        printf("enc->encodingLength = %d\n", enc->encodingLength);
-        printf("length of encoding with null byte: %lu\n",
-               strlen(enc->encoding) + 1);
         encoders[ix].encoding = malloc(encoders[ix].encodingLength);
         strncpy(encoders[ix].encoding, enc->encoding, enc->encodingLength);
         free(enc->encoding);
@@ -584,16 +580,13 @@ struct buffer *bufferInit(size_t size) {
 static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
     unsigned int newCount = buf->charCount + len;
     if (newCount >= buf->capacity) {
-        printf("Resizing buffer cap from %d", buf->capacity);
         buf->capacity *= buf->capacity;
-        printf("to %d.\n", buf->capacity);
         char *resize = realloc(buf->str, buf->capacity);
         assert(resize != NULL);
         buf->str = resize;
     }
     // using strncat is very slow, so we do the ff instead
     for (unsigned int ix = 0; ix < len; ix++) {
-        printf("%c\n", chars[ix]);
         buf->str[buf->charCount + ix] = chars[ix];
     }
     buf->charCount = newCount;
@@ -601,7 +594,6 @@ static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
 
 // return the string stored in the buffer
 static char *bufferGetStr(struct buffer *buf) {
-    printf("Buffer contents: %s\n", buf->str);
     char *output = malloc(buf->charCount + 1);
     strncpy(output, buf->str, buf->charCount + 1);
     output[buf->charCount] = '\0';
