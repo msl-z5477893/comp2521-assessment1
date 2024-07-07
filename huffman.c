@@ -75,18 +75,25 @@ struct buffer {
 };
 
 // an avl tree used for encoding data
-struct encodingTree {
-    char *code;
+// struct encodingTree {
+//     char *code;
+//     int charSum;
+//     struct encodingTree *left;
+//     struct encodingTree *right;
+// };
+
+struct encoder {
     int charSum;
-    struct encodingTree *left;
-    struct encodingTree *right;
+    unsigned int encodingLength;
+    char *encoding;
 };
 
 // misc functions.
 static bool isLeaf(struct huffmanTree *);
 static int leafCount(struct huffmanTree *);
-static char *getUtf8Char(File);
+// static char *getUtf8Char(File);
 static int characterSum(char *);
+static int treeHeight(struct huffmanTree *);
 
 // HuffmanTreeArena functions
 static struct huffmanTree *huffmanTreeFromItem(struct item);
@@ -100,30 +107,35 @@ static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
 
 // prefix path functions
 static struct prefixPath *prefixPathNew(void);
-static struct prefixPath *prefixPathRecord(struct prefixPath *, char, char *);
-static struct prefixPath *convertBranchToPath(struct huffmanTree *);
-static struct charEncoding prefixPathEncoding(struct prefixPath *);
+static struct encoder *prefixPathEncoding(struct prefixPath *);
+static void prefixPathFree(struct prefixPath *);
+static void prefixPathRecord(struct prefixPath *, char, char *);
 
 // huffmanCrawler functions
+static struct huffmanCrawler *crawlerCopy(struct huffmanCrawler *crawler);
 static struct huffmanCrawler *crawlLeft(struct huffmanCrawler *crawler);
 static struct huffmanCrawler *crawlRight(struct huffmanCrawler *crawler);
 
-// huffmanQueue functions
+// huffmanTraverser functions
 static struct huffmanTraverser *huffmanTraverserInit(struct huffmanTree *tree);
-static struct charEncoding *huffmanTraverserPerform(void);
+static struct encoder *huffmanTraverserPerform(struct huffmanTraverser *trav);
+static struct huffmanCrawler *
+huffmanTraverserPop(struct huffmanTraverser *trav);
+static void huffmanTraverserAdd(struct huffmanTraverser *trav,
+                                struct huffmanCrawler *crawler);
 static void huffmanTraverserDeinit(struct huffmanTraverser *);
 
 // buffer function
 static struct buffer *bufferInit(size_t size);
 static char *bufferGetStr(struct buffer *);
-static void bufferInsert(struct buffer *, char *chars);
+static void bufferInsert(struct buffer *, char *chars, unsigned int len);
 static void bufferFree(struct buffer *);
 
 // encodingTree functions
-static struct encodingTree *encodingTreeInit(void);
-static void encodingTreeFree(struct encodingTree *);
-static void encodingTreeInsert(struct charEncoding);
-static char *encodingTreeGetCode(char *character);
+// static struct encodingTree *encodingTreeInit(void);
+// static bool encodingTreeGetCode(char *character, char *buffer);
+// static void encodingTreeFree(struct encodingTree *);
+// static void encodingTreeInsert(struct charEncoding);
 
 // Task 1
 // decode huffman data given tree and encoding
@@ -319,28 +331,52 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
     // TODO: fix this somehow
     // initial data
     File fstream = FileOpenToRead(inputFilename);
-    int uniqueLetterCount = leafCount(tree);
-    struct buffer *buf = bufferInit(uniqueLetterCount * uniqueLetterCount);
-    struct encodingTree *encodeTree = encodingTreeInit();
-    struct huffmanTraverser *trav = huffmanTraverserInit(tree);
-    struct charEncoding *encoding = huffmanTraverserPerform();
-    while (encoding != NULL) {
-        encodingTreeInsert(*encoding);
-        encoding = huffmanTraverserPerform();
-    }
     char charBuf[MAX_CHARACTER_LEN + 1];
+    int symCount = leafCount(tree);
+    int maxEncLen = treeHeight(tree) + 1;
+    // char *codeBuf = malloc(maxEncLen);
+    struct buffer *buf =
+        bufferInit(symCount * symCount * maxEncLen * maxEncLen);
+    // struct encodingTree *encodeTree = encodingTreeInit();
+    struct huffmanTraverser *trav = huffmanTraverserInit(tree);
+    struct encoder *encoders = malloc(sizeof(struct encoder) * symCount);
+
+    // generate encoding tree from huffman tree
+    for (int ix = 0; ix < symCount; ix++) {
+        // probably will leak
+        encoders[ix] = *huffmanTraverserPerform(trav);
+        // initially the function returned a charEncoding and had
+        // to be converted to an encoder
+        //
+        // struct charEncoding *encoding = huffmanTraverserPerform(trav);
+        // encoders[ix].charSum = characterSum(encoding->character);
+        // strncpy(encoders[ix].encoding, encoding->code, MAX_CHARACTER_LEN +
+        // 1); free(encoding);
+    }
+    // struct charEncoding *encoding = huffmanTraverserPerform(trav);
+    // while (encoding != NULL) {
+    //     encodingTreeInsert(*encoding);
+    //     free(encoding);
+    //     encoding = huffmanTraverserPerform(trav);
+    // }
     // TODO: get all possible character encodings
 
     // somehow encode the entire text in file onto one massive string.
     while (FileReadCharacter(fstream, charBuf)) {
-        char *charPrefixCode = encodingTreeGetCode(charBuf);
-        bufferInsert(buf, charPrefixCode);
+        // encodingTreeGetCode(charBuf, codeBuf);
+        int charKey = characterSum(charBuf);
+        int ix = 0;
+        while (encoders[ix].charSum != charKey) {
+            ix++;
+        }
+        bufferInsert(buf, encoders[ix].encoding, encoders[ix].encodingLength);
     }
 
     char *result = bufferGetStr(buf);
 
     // cleanup :)
-    encodingTreeFree(encodeTree);
+    // encodingTreeFree(encodeTree);
+    free(encoders);
     huffmanTraverserDeinit(trav);
     bufferFree(buf);
     FileClose(fstream);
@@ -359,6 +395,7 @@ static int leafCount(struct huffmanTree *tree) {
     return countedLeaves;
 }
 
+// get tree height
 static int treeHeight(struct huffmanTree *tree) {
     if (tree == NULL) {
         return 0;
@@ -373,4 +410,217 @@ static int treeHeight(struct huffmanTree *tree) {
         }
         return max + 1;
     }
+}
+
+// get the sum of the bytes of the character
+// TODO: actually implement this.
+static int characterSum(char *str) {
+    unsigned int ix = 0;
+    int sum = 0;
+    while (str[ix] != '\0') {
+        sum += (int)str[ix];
+        ix++;
+    }
+    return sum;
+}
+
+// implementation of huffmanTraverser functions
+
+// initialises a traverser for a specified tree
+static struct huffmanTraverser *huffmanTraverserInit(struct huffmanTree *tree) {
+    struct huffmanTraverser *trav = malloc(sizeof(struct huffmanTraverser));
+    struct huffmanCrawler *initCrawler = malloc(sizeof(struct huffmanCrawler));
+    initCrawler->address = prefixPathNew();
+    initCrawler->tree = tree;
+    initCrawler->next = NULL;
+    trav->head = initCrawler;
+    trav->tail = initCrawler;
+    return trav;
+}
+
+// traverse the tree via traverser until we find a leaf node,
+// then return the character and it's encoding via a struct.
+static struct encoder *huffmanTraverserPerform(struct huffmanTraverser *trav) {
+    while (true) {
+        struct huffmanCrawler *poppedCrawler = huffmanTraverserPop(trav);
+        if (poppedCrawler->tree->character != NULL) {
+            prefixPathRecord(poppedCrawler->address, ENCODING_END,
+                             poppedCrawler->tree->character);
+            struct encoder *charEnc =
+                prefixPathEncoding(poppedCrawler->address);
+            prefixPathFree(poppedCrawler->address);
+            free(poppedCrawler);
+            return charEnc;
+        } else {
+            if (poppedCrawler->tree->left != NULL) {
+                struct huffmanCrawler *left = crawlLeft(poppedCrawler);
+                huffmanTraverserAdd(trav, left);
+            }
+            if (poppedCrawler->tree->right != NULL) {
+                struct huffmanCrawler *right = crawlRight(poppedCrawler);
+                huffmanTraverserAdd(trav, right);
+            }
+            free(poppedCrawler);
+        }
+    }
+}
+
+// remove first element within the traverser
+static struct huffmanCrawler *
+huffmanTraverserPop(struct huffmanTraverser *trav) {
+    struct huffmanCrawler *pop = trav->head;
+    trav->head = trav->head->next;
+    return pop;
+}
+
+// append an element to the huffman traverser
+static void huffmanTraverserAdd(struct huffmanTraverser *trav,
+                                struct huffmanCrawler *crawl) {
+    if (trav->head == NULL) {
+        trav->head = crawl;
+        trav->tail = crawl;
+    } else {
+        trav->tail->next = crawl;
+        trav->tail = trav->tail->next;
+    }
+}
+
+// free huffman traverser
+// asserts there are no more crawlers tracked
+static void huffmanTraverserDeinit(struct huffmanTraverser *trav) {
+    assert(trav->head == NULL);
+    free(trav);
+}
+
+// implementation of huffmanCrawler functions
+
+// move crawler one branch down to the left
+static struct huffmanCrawler *crawlLeft(struct huffmanCrawler *crawl) {
+    struct huffmanCrawler *newCrawler = crawlerCopy(crawl);
+    newCrawler->tree = newCrawler->tree->left;
+    prefixPathRecord(newCrawler->address, ENCODING_0, NULL);
+    return newCrawler;
+}
+
+// move crawler one branch down to the right
+static struct huffmanCrawler *crawlRight(struct huffmanCrawler *crawl) {
+    struct huffmanCrawler *newCrawler = crawlerCopy(crawl);
+    newCrawler->tree = newCrawler->tree->right;
+    prefixPathRecord(newCrawler->address, ENCODING_1, NULL);
+    return newCrawler;
+}
+
+// copy crawler instance
+static struct huffmanCrawler *crawlerCopy(struct huffmanCrawler *crawl) {
+    struct huffmanCrawler *copy = malloc(sizeof(struct huffmanCrawler));
+    copy->next = NULL;
+    copy->address = crawl->address;
+    copy->tree = crawl->tree;
+    return copy;
+}
+
+// implementation of prefixPath functions
+
+// create an empty prefixPath structure
+static struct prefixPath *prefixPathNew() {
+    struct prefixPath *path = malloc(sizeof(struct prefixPath));
+    path->head = NULL;
+    path->length = 0;
+    path->tail = NULL;
+    return path;
+}
+
+// free entire prefixPath
+static void prefixPathFree(struct prefixPath *path) {
+    PrefixNode *currentNode = path->head;
+    while (currentNode != NULL) {
+        PrefixNode *trash = currentNode;
+        currentNode = currentNode->next;
+        if (trash->finalChar != NULL) {
+            free(trash->finalChar);
+        }
+        free(trash);
+    }
+}
+
+// generate an encoder for a specific character based on recorded
+// path
+static struct encoder *prefixPathEncoding(struct prefixPath *path) {
+    assert(path->tail->finalChar != NULL);
+    struct encoder *newEncoding = malloc(sizeof(struct encoder));
+    newEncoding->charSum = characterSum(path->tail->finalChar);
+    newEncoding->encoding = malloc(path->length);
+    unsigned int ix = 0;
+    for (PrefixNode *n = path->head; n != NULL; n = n->next) {
+        if (n->dir == ENCODING_END) {
+            newEncoding->encoding[ix] = '\0';
+        } else {
+            newEncoding->encoding[ix] = n->dir;
+        }
+        ix++;
+    }
+    newEncoding->encodingLength = path->length;
+    assert(newEncoding->encoding[path->length - 1] == '\0');
+    return newEncoding;
+}
+
+// update the path when traversing down a tree
+static void prefixPathRecord(struct prefixPath *path, char dir,
+                             char *finalChar) {
+    // create the new node
+    PrefixNode *newPathNode = malloc(sizeof(PrefixNode));
+    newPathNode->dir = dir;
+    newPathNode->next = NULL;
+    if (finalChar != NULL) {
+        newPathNode->finalChar = malloc(MAX_CHARACTER_LEN + 1);
+        strncpy(newPathNode->finalChar, finalChar, MAX_CHARACTER_LEN + 1);
+    } else {
+        newPathNode->finalChar = NULL;
+    }
+
+    // add node to linked list.
+    if (path->head == NULL) {
+        path->head = newPathNode;
+        path->tail = newPathNode;
+    } else {
+        path->tail->next = newPathNode;
+        path->tail = path->tail->next;
+    }
+
+    path->length++;
+}
+
+// implementation of buffer functions
+
+// create a new buffer with an initial size.
+struct buffer *bufferInit(size_t size) {
+    struct buffer *nBuf = malloc(sizeof(struct buffer));
+    nBuf->charCount = 0;
+    nBuf->capacity = size;
+    nBuf->str = malloc(nBuf->capacity);
+    return nBuf;
+}
+
+// insert to buffer, resizing the string allocation if necessary
+static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
+    unsigned int newCount = buf->charCount + len;
+    if (newCount >= buf->capacity) {
+        buf->capacity *= buf->capacity;
+        buf->str = realloc(buf->str, buf->capacity);
+    }
+    strncat(buf->str, chars, len);
+    buf->charCount = newCount;
+}
+
+// return the string stored in the buffer
+static char *bufferGetStr(struct buffer *buf) {
+    char *output = malloc(buf->charCount + 1);
+    strncpy(output, buf->str, buf->charCount + 1);
+    return output;
+}
+
+// free buffer
+static void bufferFree(struct buffer *buf) {
+    free(buf->str);
+    free(buf);
 }
