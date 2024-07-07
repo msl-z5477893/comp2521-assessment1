@@ -107,6 +107,7 @@ static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
 
 // prefix path functions
 static struct prefixPath *prefixPathNew(void);
+static struct prefixPath *prefixPathCopy(struct prefixPath *orig);
 static struct encoder *prefixPathEncoding(struct prefixPath *);
 static void prefixPathFree(struct prefixPath *);
 static void prefixPathRecord(struct prefixPath *, char, char *);
@@ -514,7 +515,10 @@ static struct huffmanCrawler *crawlRight(struct huffmanCrawler *crawl) {
 static struct huffmanCrawler *crawlerCopy(struct huffmanCrawler *crawl) {
     struct huffmanCrawler *copy = malloc(sizeof(struct huffmanCrawler));
     copy->next = NULL;
-    copy->address = crawl->address;
+    // ERROR: This instruction causes all crawlers to operate on the
+    // same path.
+    // A dedicated copy function for prefix paths must be used.
+    copy->address = prefixPathCopy(crawl->address);
     copy->tree = crawl->tree;
     return copy;
 }
@@ -588,6 +592,17 @@ static void prefixPathRecord(struct prefixPath *path, char dir,
     }
 
     path->length++;
+}
+
+// create a copy of a prefix path
+static struct prefixPath *prefixPathCopy(struct prefixPath *orig) {
+    struct prefixPath *copy = prefixPathNew();
+    PrefixNode *origPointer = orig->head;
+    while (origPointer != NULL) {
+        prefixPathRecord(copy, origPointer->dir, origPointer->finalChar);
+        origPointer = origPointer->next;
+    }
+    return copy;
 }
 
 // implementation of buffer functions
