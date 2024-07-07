@@ -631,6 +631,7 @@ static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
 static char *bufferGetStr(struct buffer *buf) {
     char *output = malloc(buf->charCount + 1);
     strncpy(output, buf->str, buf->charCount + 1);
+    output[buf->charCount] = '\0';
     return output;
 }
 
