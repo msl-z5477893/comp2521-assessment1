@@ -1,5 +1,12 @@
 // Implementation of the Counter ADT
+//
 // THIS IS FOR TASK 2
+//
+// The Counter ADT is used to store and manage the count
+// of various symbols in a file.
+// Include Counter.h to use this structure.
+//
+// Completed by Michael Stephen Lape (z5477893)
 
 #include <assert.h>
 #include <stdbool.h>
@@ -33,9 +40,9 @@ struct node {
 
 // queue functions
 static struct queue *queueNew(void);
-static void queueInsert(struct queue *, void *);
 static struct node *queuePop(struct queue *);
 static bool queueIsEmpty(struct queue *);
+static void queueInsert(struct queue *, void *);
 static void queueFree(struct queue *);
 
 // create new counter tree
@@ -67,30 +74,22 @@ void CounterFree(Counter c) {
 void CounterAdd(Counter c, char *character) {
     if (c->character[0] == '\0') {
         // case 0: initial tree is empty
-        // printf("Empty tree node found! inserting %s...\n",
-        // character);
         strncpy(c->character, character, 5);
         c->count++;
     } else if (!strcmp(c->character, character)) {
-        // printf(
-        //     "recording character \"%s\", which is tallied %d
-        //     times.\n", c->character, c->count);
         c->count++;
     } else if (strcmp(c->character, character) < 0) {
         if (c->left == NULL) {
             c->left = CounterNew();
         }
-        // printf("Entering left of tree...\n");
         CounterAdd(c->left, character);
 
     } else if (strcmp(c->character, character) > 0) {
         if (c->right == NULL) {
             c->right = CounterNew();
         }
-        // printf("Entering right of tree...\n");
         CounterAdd(c->right, character);
     }
-    // printf("Function call exited.\n");
 }
 
 // count the number of unique items recorded by tree
@@ -109,8 +108,6 @@ int CounterGet(Counter c, char *character) {
     Counter cPtr = c;
     while (cPtr != NULL) {
         if (!strcmp(cPtr->character, character)) {
-            // printf("Character %s has been recorded with freq
-            // %d\n", cPtr->character, cPtr->count);
             return cPtr->count;
         } else if (strcmp(cPtr->character, character) < 0) {
             cPtr = cPtr->left;
@@ -134,7 +131,6 @@ struct item *CounterItems(Counter c, int *numItems) {
     struct queue *counterQueue = queueNew();
     queueInsert(counterQueue, c);
     while (!queueIsEmpty(counterQueue)) {
-        // printf("CounterItems iteration %d.\n", itemsArrayCount);
         struct node *dequeued = queuePop(counterQueue);
         Counter counterToItem = dequeued->content;
 
