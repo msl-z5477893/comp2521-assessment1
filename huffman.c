@@ -74,14 +74,7 @@ struct buffer {
     unsigned int charCount;
 };
 
-// an avl tree used for encoding data
-// struct encodingTree {
-//     char *code;
-//     int charSum;
-//     struct encodingTree *left;
-//     struct encodingTree *right;
-// };
-
+// the struct used for encoding in task 4.
 struct encoder {
     int charSum;
     unsigned int encodingLength;
@@ -103,7 +96,6 @@ static struct huffmanTreeArenaNode *
 huffmanTreeArenaPop(struct huffmanTreeArena *);
 static bool huffmanTreeArenaAdd(struct huffmanTreeArena *,
                                 struct huffmanTree *);
-static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *);
 
 // prefix path functions
 static struct prefixPath *prefixPathNew(void);
@@ -131,12 +123,6 @@ static struct buffer *bufferInit(size_t size);
 static char *bufferGetStr(struct buffer *);
 static void bufferInsert(struct buffer *, char *chars, unsigned int len);
 static void bufferFree(struct buffer *);
-
-// encodingTree functions
-// static struct encodingTree *encodingTreeInit(void);
-// static bool encodingTreeGetCode(char *character, char *buffer);
-// static void encodingTreeFree(struct encodingTree *);
-// static void encodingTreeInsert(struct charEncoding);
 
 // Task 1
 // decode huffman data given tree and encoding
@@ -185,15 +171,9 @@ struct huffmanTree *createHuffmanTree(char *inputFilename) {
     // frequncy.
     struct item *fileCharData = CounterItems(charCount, &distinctCharCount);
     struct huffmanTreeArena *treeArena = huffmanTreeArenaNew();
-    printf("Start proessing item array...\n");
     for (int index = 0; index < distinctCharCount; index++) {
-        // printf("proccessing character \"%s\"...\n",
-        //        fileCharData[index].character);
         struct huffmanTree *tree = huffmanTreeFromItem(fileCharData[index]);
         huffmanTreeArenaAdd(treeArena, tree);
-        if (!huffmanTreeArenaAssertOrder(treeArena)) {
-            printf("WARNING: tree went out of order!\n");
-        }
     }
 
     while (treeArena->size != 1) {
@@ -213,9 +193,6 @@ struct huffmanTree *createHuffmanTree(char *inputFilename) {
         huffmanTreeArenaAdd(treeArena, newBiggerTree);
         free(arenaNode1);
         free(arenaNode2);
-        if (!huffmanTreeArenaAssertOrder(treeArena)) {
-            printf("WARNING: tree went out of order!\n");
-        }
     }
     printf("final size of arena: %d\n.", treeArena->size);
     struct huffmanTreeArenaNode *lastNode = huffmanTreeArenaPop(treeArena);
@@ -315,18 +292,6 @@ huffmanTreeArenaPop(struct huffmanTreeArena *arena) {
     return popped;
 }
 
-// checks that the trees in the arena is still in ascending order.
-static bool huffmanTreeArenaAssertOrder(struct huffmanTreeArena *arena) {
-    struct huffmanTreeArenaNode *arenaNode = arena->head;
-    while (arenaNode->next != NULL) {
-        if (arenaNode->tree->freq > arenaNode->next->tree->freq) {
-            return false;
-        }
-        arenaNode = arenaNode->next;
-    }
-    return true;
-}
-
 // Task 4
 char *encode(struct huffmanTree *tree, char *inputFilename) {
     // TODO: fix this somehow
@@ -335,17 +300,13 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
     char charBuf[MAX_CHARACTER_LEN + 1];
     int symCount = leafCount(tree);
     int maxEncLen = treeHeight(tree) + 1;
-    // char *codeBuf = malloc(maxEncLen);
     struct buffer *buf =
         bufferInit(symCount * symCount * maxEncLen * maxEncLen);
-    // struct encodingTree *encodeTree = encodingTreeInit();
     struct huffmanTraverser *trav = huffmanTraverserInit(tree);
     struct encoder *encoders = malloc(sizeof(struct encoder) * symCount);
 
     // generate encoding tree from huffman tree
     for (int ix = 0; ix < symCount; ix++) {
-        // this leaks
-        // encoders[ix] = *huffmanTraverserPerform(trav);
         struct encoder *enc = huffmanTraverserPerform(trav);
         encoders[ix].charSum = enc->charSum;
         encoders[ix].encodingLength = enc->encodingLength;
@@ -353,9 +314,6 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
         printf("length of encoding with null byte: %lu\n",
                strlen(enc->encoding) + 1);
         encoders[ix].encoding = malloc(encoders[ix].encodingLength);
-        // @broken
-        // strncpy(encoders[ix].encoding, enc->encoding,
-        // encoders->encodingLength);
         strncpy(encoders[ix].encoding, enc->encoding, enc->encodingLength);
         free(enc->encoding);
         free(enc);
@@ -363,7 +321,6 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
 
     // somehow encode the entire text in file onto one massive string.
     while (FileReadCharacter(fstream, charBuf)) {
-        // encodingTreeGetCode(charBuf, codeBuf);
         int charKey = characterSum(charBuf);
         int ix = 0;
         while (encoders[ix].charSum != charKey) {
@@ -417,12 +374,12 @@ static int treeHeight(struct huffmanTree *tree) {
 }
 
 // get the sum of the bytes of the character
-// TODO: actually implement this.
+// not perfect, prone to collisions, fails to encode wonderland
 static int characterSum(char *str) {
     unsigned int ix = 0;
     int sum = 0;
     while (str[ix] != '\0') {
-        sum += (int)str[ix];
+        sum += str[ix] * str[ix];
         ix++;
     }
     return sum;
@@ -634,9 +591,7 @@ static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
         assert(resize != NULL);
         buf->str = resize;
     }
-    // using strncat directly is ridiculously slow, so we have to try a new
-    // method.
-    // strncat(buf->str, chars, len);
+    // using strncat is very slow, so we do the ff instead
     for (unsigned int ix = 0; ix < len; ix++) {
         printf("%c\n", chars[ix]);
         buf->str[buf->charCount + ix] = chars[ix];
