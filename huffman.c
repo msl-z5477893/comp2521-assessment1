@@ -369,7 +369,8 @@ char *encode(struct huffmanTree *tree, char *inputFilename) {
         while (encoders[ix].charSum != charKey) {
             ix++;
         }
-        bufferInsert(buf, encoders[ix].encoding, encoders[ix].encodingLength);
+        bufferInsert(buf, encoders[ix].encoding,
+                     encoders[ix].encodingLength - 1);
     }
     // bufferInsert(buf, "\n", strlen("\n") + 1);
 
@@ -618,7 +619,7 @@ struct buffer *bufferInit(size_t size) {
     nBuf->capacity = size;
     nBuf->str = malloc(nBuf->capacity);
     // needed for string functions to work.
-    nBuf->str[0] = '\0';
+    // nBuf->str[0] = '\0';
     return nBuf;
 }
 
@@ -633,7 +634,13 @@ static void bufferInsert(struct buffer *buf, char *chars, unsigned int len) {
         assert(resize != NULL);
         buf->str = resize;
     }
-    strncat(buf->str, chars, len);
+    // using strncat directly is ridiculously slow, so we have to try a new
+    // method.
+    // strncat(buf->str, chars, len);
+    for (unsigned int ix = 0; ix < len; ix++) {
+        printf("%c\n", chars[ix]);
+        buf->str[buf->charCount + ix] = chars[ix];
+    }
     buf->charCount = newCount;
 }
 
